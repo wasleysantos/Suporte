@@ -7,13 +7,13 @@ import {
   MessageCircle,
   Mail,
   FileText,
-  Building2,
   Plus,
   CircleHelp,
   Paperclip,
   User,
   HardDrive,
   Computer,
+  Pencil,
 } from "lucide-react";
 
 import { Input } from "@/components/ui/input";
@@ -83,6 +83,9 @@ const Index = () => {
   const [openDialog, setOpenDialog] = useState(false);
   const [formType, setFormType] = useState<FormType>("script");
 
+  const [isEditing, setIsEditing] = useState(false);
+  const [editingId, setEditingId] = useState<number | null>(null);
+
   const [title, setTitle] = useState("");
   const [text, setText] = useState("");
   const [phones, setPhones] = useState("");
@@ -105,12 +108,49 @@ const Index = () => {
     setFile(null);
     setEquipment("");
     setDriverFile(null);
+    setIsEditing(false);
+    setEditingId(null);
   };
 
   const openNewItemDialog = (type: FormType) => {
-    setFormType(type);
     resetForm();
+    setFormType(type);
+    setIsEditing(false);
+    setEditingId(null);
     setOpenDialog(true);
+  };
+
+  const handleEdit = (
+    type: FormType,
+    item: ScriptItem | ContactItem | FAQItem | DriverItem,
+  ) => {
+    resetForm();
+    setFormType(type);
+    setIsEditing(true);
+    setEditingId(item.id);
+    setOpenDialog(true);
+
+    if (type === "contact") {
+      const contact = item as ContactItem;
+      setTitle(contact.title);
+      setText(contact.text);
+      setPhones((contact.phones || []).join(", "));
+      setWhatsapp((contact.whatsapp || []).join(", "));
+      setEmails((contact.emails || []).join(", "));
+    }
+
+    if (type === "faq") {
+      const faq = item as FAQItem;
+      setTitle(faq.title);
+      setText(faq.text);
+      setAuthor(faq.author || "");
+    }
+
+    if (type === "driver") {
+      const driver = item as DriverItem;
+      setEquipment(driver.equipment);
+      setAuthor(driver.author);
+    }
   };
 
   const toArray = (value: string) =>
@@ -181,10 +221,13 @@ const Index = () => {
 
   const handleSave = async () => {
     if (formType === "driver") {
-      if (!equipment.trim() || !author.trim() || !driverFile) {
-        toast.error(
-          "Preencha equipamento, autor e selecione o arquivo do driver.",
-        );
+      if (!equipment.trim() || !author.trim()) {
+        toast.error("Preencha equipamento e autor.");
+        return;
+      }
+
+      if (!isEditing && !driverFile) {
+        toast.error("Selecione o arquivo do driver.");
         return;
       }
     } else {
@@ -196,6 +239,64 @@ const Index = () => {
       if (formType === "faq" && !author.trim()) {
         toast.error("Informe o autor da FAQ.");
         return;
+      }
+    }
+
+    if (formType === "contact") {
+      const normalizedTitle = title.trim().toLowerCase();
+      const newPhones = toArray(phones);
+      const newWhatsapp = toArray(whatsapp);
+      const newEmails = toArray(emails).map((email) => email.toLowerCase());
+
+      const duplicateContact = contacts.find((contact) => {
+        if (isEditing && contact.id === editingId) return false;
+
+        const sameTitle = contact.title.trim().toLowerCase() === normalizedTitle;
+
+        const samePhone = (contact.phones || []).some((phone) =>
+          newPhones.includes(phone),
+        );
+
+        const sameWhatsapp = (contact.whatsapp || []).some((zap) =>
+          newWhatsapp.includes(zap),
+        );
+
+        const sameEmail = (contact.emails || []).some((email) =>
+          newEmails.includes(email.toLowerCase()),
+        );
+
+        return sameTitle || samePhone || sameWhatsapp || sameEmail;
+      });
+
+      if (duplicateContact) {
+        if (duplicateContact.title.trim().toLowerCase() === normalizedTitle) {
+          toast.error("Já existe um setor cadastrado com esse nome.");
+          return;
+        }
+
+        const phoneDuplicado = (duplicateContact.phones || []).find((phone) =>
+          newPhones.includes(phone),
+        );
+        if (phoneDuplicado) {
+          toast.error(`O telefone ${phoneDuplicado} já está cadastrado.`);
+          return;
+        }
+
+        const whatsappDuplicado = (duplicateContact.whatsapp || []).find((zap) =>
+          newWhatsapp.includes(zap),
+        );
+        if (whatsappDuplicado) {
+          toast.error(`O WhatsApp ${whatsappDuplicado} já está cadastrado.`);
+          return;
+        }
+
+        const emailDuplicado = (duplicateContact.emails || []).find((email) =>
+          newEmails.includes(email.toLowerCase()),
+        );
+        if (emailDuplicado) {
+          toast.error(`O e-mail ${emailDuplicado} já está cadastrado.`);
+          return;
+        }
       }
     }
 
@@ -221,28 +322,52 @@ const Index = () => {
       }
 
       if (formType === "contact") {
-        const { data, error } = await supabase
-          .from("contacts")
-          .insert([
-            {
+        if (isEditing && editingId) {
+          const { data, error } = await supabase
+            .from("contacts")
+            .update({
               title: title.trim(),
               text: text.trim(),
               phones: toArray(phones),
               whatsapp: toArray(whatsapp),
               emails: toArray(emails),
-            },
-          ])
-          .select()
-          .single();
+            })
+            .eq("id", editingId)
+            .select()
+            .single();
 
-        if (error) throw error;
+          if (error) throw error;
 
-        setContacts((prev) => [data as ContactItem, ...prev]);
-        toast.success("Contato adicionado com sucesso!");
+          setContacts((prev) =>
+            prev.map((item) =>
+              item.id === editingId ? (data as ContactItem) : item,
+            ),
+          );
+          toast.success("Contato atualizado com sucesso!");
+        } else {
+          const { data, error } = await supabase
+            .from("contacts")
+            .insert([
+              {
+                title: title.trim(),
+                text: text.trim(),
+                phones: toArray(phones),
+                whatsapp: toArray(whatsapp),
+                emails: toArray(emails),
+              },
+            ])
+            .select()
+            .single();
+
+          if (error) throw error;
+
+          setContacts((prev) => [data as ContactItem, ...prev]);
+          toast.success("Contato adicionado com sucesso!");
+        }
       }
 
       if (formType === "faq") {
-        let fileUrl: string | null = null;
+        let fileUrl: string | null | undefined = undefined;
 
         if (file) {
           const safeName = sanitizeFileName(file.name);
@@ -264,58 +389,134 @@ const Index = () => {
           fileUrl = publicUrlData.publicUrl;
         }
 
-        const { data, error } = await supabase
-          .from("faqs")
-          .insert([
-            {
-              title: title.trim(),
-              text: text.trim(),
-              author: author.trim(),
-              file_url: fileUrl,
-            },
-          ])
-          .select()
-          .single();
+        if (isEditing && editingId) {
+          const updatePayload: {
+            title: string;
+            text: string;
+            author: string;
+            file_url?: string | null;
+          } = {
+            title: title.trim(),
+            text: text.trim(),
+            author: author.trim(),
+          };
 
-        if (error) throw error;
+          if (fileUrl !== undefined) {
+            updatePayload.file_url = fileUrl;
+          }
 
-        setFaqs((prev) => [data as FAQItem, ...prev]);
-        toast.success("FAQ adicionada com sucesso!");
+          const { data, error } = await supabase
+            .from("faqs")
+            .update(updatePayload)
+            .eq("id", editingId)
+            .select()
+            .single();
+
+          if (error) throw error;
+
+          setFaqs((prev) =>
+            prev.map((item) =>
+              item.id === editingId ? (data as FAQItem) : item,
+            ),
+          );
+          toast.success("FAQ atualizada com sucesso!");
+        } else {
+          const { data, error } = await supabase
+            .from("faqs")
+            .insert([
+              {
+                title: title.trim(),
+                text: text.trim(),
+                author: author.trim(),
+                file_url: fileUrl ?? null,
+              },
+            ])
+            .select()
+            .single();
+
+          if (error) throw error;
+
+          setFaqs((prev) => [data as FAQItem, ...prev]);
+          toast.success("FAQ adicionada com sucesso!");
+        }
       }
 
       if (formType === "driver") {
-        const safeName = sanitizeFileName(driverFile!.name);
-        const filePath = `drivers/${Date.now()}-${safeName}`;
+        let fileUrl: string | undefined = undefined;
 
-        const { error: uploadError } = await supabase.storage
-          .from(DRIVER_BUCKET)
-          .upload(filePath, driverFile!, {
-            cacheControl: "3600",
-            upsert: false,
-          });
+        if (driverFile) {
+          const safeName = sanitizeFileName(driverFile.name);
+          const filePath = `drivers/${Date.now()}-${safeName}`;
 
-        if (uploadError) throw uploadError;
+          const { error: uploadError } = await supabase.storage
+            .from(DRIVER_BUCKET)
+            .upload(filePath, driverFile, {
+              cacheControl: "3600",
+              upsert: false,
+            });
 
-        const { data: publicUrlData } = supabase.storage
-          .from(DRIVER_BUCKET)
-          .getPublicUrl(filePath);
+          if (uploadError) throw uploadError;
 
-        const { data, error } = await supabase
-          .from("drivers")
-          .insert([
-            {
-              equipment: equipment.trim(),
-              author: author.trim(),
-              file_url: publicUrlData.publicUrl,
-            },
-          ])
-          .select()
-          .single();
+          const { data: publicUrlData } = supabase.storage
+            .from(DRIVER_BUCKET)
+            .getPublicUrl(filePath);
 
-        if (error) throw error;
+          fileUrl = publicUrlData.publicUrl;
+        }
 
-        setDrivers((prev) => [data as DriverItem, ...prev]);
-        toast.success("Driver adicionado com sucesso!");
+        if (isEditing && editingId) {
+          const updatePayload: {
+            equipment: string;
+            author: string;
+            file_url?: string;
+          } = {
+            equipment: equipment.trim(),
+            author: author.trim(),
+          };
+
+          if (fileUrl) {
+            updatePayload.file_url = fileUrl;
+          }
+
+          const { data, error } = await supabase
+            .from("drivers")
+            .update(updatePayload)
+            .eq("id", editingId)
+            .select()
+            .single();
+
+          if (error) throw error;
+
+          setDrivers((prev) =>
+            prev.map((item) =>
+              item.id === editingId ? (data as DriverItem) : item,
+            ),
+          );
+          toast.success("Driver atualizado com sucesso!");
+        } else {
+          if (!fileUrl) {
+            toast.error("Selecione o arquivo do driver.");
+            setSaving(false);
+            return;
+          }
+
+          const { data, error } = await supabase
+            .from("drivers")
+            .insert([
+              {
+                equipment: equipment.trim(),
+                author: author.trim(),
+                file_url: fileUrl,
+              },
+            ])
+            .select()
+            .single();
+
+          if (error) throw error;
+
+          setDrivers((prev) => [data as DriverItem, ...prev]);
+          toast.success("Driver adicionado com sucesso!");
+        }
       }
 
       resetForm();
@@ -385,10 +586,10 @@ const Index = () => {
         <div className="mx-auto flex max-w-6xl items-center gap-4 px-4 py-4">
           <div className="flex items-center gap-3">
             <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary-foreground/20 text-lg font-bold text-primary-foreground">
-              <Computer></Computer>
+              <Computer />
             </div>
             <div>
-              <h1 className="text-lg font-bold leading-tight">Suporte N2</h1>
+              <h1 className="text-lg font-bold leading-tight">Suporte</h1>
               <p className="text-xs text-primary-foreground/70">
                 Base de conhecimento
               </p>
@@ -536,9 +737,7 @@ const Index = () => {
                     className="transition-shadow hover:shadow-lg"
                   >
                     <CardHeader className="pb-2">
-                      <CardTitle className="text-base">
-                        {contact.title}
-                      </CardTitle>
+                      <CardTitle className="text-base">{contact.title}</CardTitle>
                     </CardHeader>
 
                     <CardContent className="space-y-3">
@@ -606,6 +805,16 @@ const Index = () => {
                             <Copy className="h-4 w-4" /> Copiar
                           </>
                         )}
+                      </Button>
+
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => handleEdit("contact", contact)}
+                        className="w-full gap-2"
+                      >
+                        <Pencil className="h-4 w-4" />
+                        Editar
                       </Button>
                     </CardContent>
                   </Card>
@@ -680,6 +889,16 @@ const Index = () => {
                           </>
                         )}
                       </Button>
+
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => handleEdit("faq", faq)}
+                        className="w-full gap-2"
+                      >
+                        <Pencil className="h-4 w-4" />
+                        Editar
+                      </Button>
                     </CardContent>
                   </Card>
                 ))}
@@ -729,6 +948,16 @@ const Index = () => {
                         <Paperclip className="h-4 w-4" />
                         {getFileNameFromUrl(driver.file_url)}
                       </a>
+
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => handleEdit("driver", driver)}
+                        className="w-full gap-2"
+                      >
+                        <Pencil className="h-4 w-4" />
+                        Editar
+                      </Button>
                     </CardContent>
                   </Card>
                 ))}
@@ -748,9 +977,12 @@ const Index = () => {
             <DialogHeader>
               <DialogTitle>
                 {formType === "script" && "Adicionar novo Script"}
-                {formType === "contact" && "Contato de Setor"}
-                {formType === "faq" && "Adicionar nova FAQ"}
-                {formType === "driver" && "Adicionar novo Driver"}
+                {formType === "contact" &&
+                  (isEditing ? "Editar Contato" : "Contato de Setor")}
+                {formType === "faq" &&
+                  (isEditing ? "Editar FAQ" : "Adicionar nova FAQ")}
+                {formType === "driver" &&
+                  (isEditing ? "Editar Driver" : "Adicionar novo Driver")}
               </DialogTitle>
             </DialogHeader>
 
@@ -873,7 +1105,13 @@ const Index = () => {
                   Cancelar
                 </Button>
                 <Button onClick={handleSave} disabled={saving}>
-                  {saving ? "Salvando..." : "Salvar"}
+                  {saving
+                    ? "Salvando..."
+                    : formType === "script"
+                      ? "Salvar"
+                      : isEditing
+                        ? "Atualizar"
+                        : "Salvar"}
                 </Button>
               </div>
             </div>
