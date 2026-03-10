@@ -14,6 +14,7 @@ import {
   HardDrive,
   Computer,
   Pencil,
+  Link as LinkIcon,
 } from "lucide-react";
 
 import { Input } from "@/components/ui/input";
@@ -64,7 +65,13 @@ type DriverItem = {
   file_url: string;
 };
 
-type FormType = "script" | "contact" | "faq" | "driver";
+type ImportantLinkItem = {
+  id: number;
+  system: string;
+  url: string;
+};
+
+type FormType = "script" | "contact" | "faq" | "driver" | "link";
 
 const FAQ_BUCKET = "faq-files";
 const DRIVER_BUCKET = "driver-files";
@@ -77,6 +84,7 @@ const Index = () => {
   const [contacts, setContacts] = useState<ContactItem[]>([]);
   const [faqs, setFaqs] = useState<FAQItem[]>([]);
   const [drivers, setDrivers] = useState<DriverItem[]>([]);
+  const [importantLinks, setImportantLinks] = useState<ImportantLinkItem[]>([]);
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -99,6 +107,9 @@ const Index = () => {
   const [equipment, setEquipment] = useState("");
   const [driverFile, setDriverFile] = useState<File | null>(null);
 
+  const [systemName, setSystemName] = useState("");
+  const [linkUrl, setLinkUrl] = useState("");
+
   const resetForm = () => {
     setTitle("");
     setText("");
@@ -109,6 +120,8 @@ const Index = () => {
     setFile(null);
     setEquipment("");
     setDriverFile(null);
+    setSystemName("");
+    setLinkUrl("");
     setIsEditing(false);
     setEditingId(null);
   };
@@ -123,7 +136,7 @@ const Index = () => {
 
   const handleEdit = (
     type: FormType,
-    item: ScriptItem | ContactItem | FAQItem | DriverItem,
+    item: ScriptItem | ContactItem | FAQItem | DriverItem | ImportantLinkItem,
   ) => {
     resetForm();
     setFormType(type);
@@ -152,6 +165,12 @@ const Index = () => {
       setEquipment(driver.equipment);
       setAuthor(driver.author);
     }
+
+    if (type === "link") {
+      const link = item as ImportantLinkItem;
+      setSystemName(link.system);
+      setLinkUrl(link.url);
+    }
   };
 
   const toArray = (value: string) =>
@@ -166,6 +185,18 @@ const Index = () => {
       .replace(/[\u0300-\u036f]/g, "")
       .replace(/\s+/g, "-")
       .replace(/[^a-zA-Z0-9.-]/g, "");
+
+  const normalizeUrl = (url: string) => {
+    const trimmed = url.trim();
+    if (!trimmed) return "";
+    if (/^https?:\/\//i.test(trimmed)) return trimmed;
+    return `https://${trimmed}`;
+  };
+
+  const toWhatsappUrl = (value: string) => {
+    const number = value.replace(/\D/g, "");
+    return `https://wa.me/${number}`;
+  };
 
   const handleCopy = async (value: string, id: number) => {
     try {
@@ -192,22 +223,35 @@ const Index = () => {
     setLoading(true);
 
     try {
-      const [scriptsRes, contactsRes, faqsRes, driversRes] = await Promise.all([
-        supabase.from("scripts").select("*").order("id", { ascending: false }),
-        supabase.from("contacts").select("*").order("id", { ascending: false }),
-        supabase.from("faqs").select("*").order("id", { ascending: false }),
-        supabase.from("drivers").select("*").order("id", { ascending: false }),
-      ]);
+      const [scriptsRes, contactsRes, faqsRes, driversRes, linksRes] =
+        await Promise.all([
+          supabase.from("scripts").select("*").order("id", { ascending: false }),
+          supabase
+            .from("contacts")
+            .select("*")
+            .order("id", { ascending: false }),
+          supabase.from("faqs").select("*").order("id", { ascending: false }),
+          supabase
+            .from("drivers")
+            .select("*")
+            .order("id", { ascending: false }),
+          supabase
+            .from("important_links")
+            .select("*")
+            .order("id", { ascending: false }),
+        ]);
 
       if (scriptsRes.error) throw scriptsRes.error;
       if (contactsRes.error) throw contactsRes.error;
       if (faqsRes.error) throw faqsRes.error;
       if (driversRes.error) throw driversRes.error;
+      if (linksRes.error) throw linksRes.error;
 
       setScripts((scriptsRes.data as ScriptItem[]) || []);
       setContacts((contactsRes.data as ContactItem[]) || []);
       setFaqs((faqsRes.data as FAQItem[]) || []);
       setDrivers((driversRes.data as DriverItem[]) || []);
+      setImportantLinks((linksRes.data as ImportantLinkItem[]) || []);
     } catch (error: any) {
       console.error("Erro ao carregar dados:", error);
       toast.error(error?.message || "Erro ao carregar dados do Supabase.");
@@ -229,6 +273,11 @@ const Index = () => {
 
       if (!isEditing && !driverFile) {
         toast.error("Selecione o arquivo do driver.");
+        return;
+      }
+    } else if (formType === "link") {
+      if (!systemName.trim() || !linkUrl.trim()) {
+        toast.error("Preencha sistema e link.");
         return;
       }
     } else {
@@ -521,6 +570,47 @@ const Index = () => {
         }
       }
 
+      if (formType === "link") {
+        const normalizedUrl = normalizeUrl(linkUrl);
+
+        if (isEditing && editingId) {
+          const { data, error } = await supabase
+            .from("important_links")
+            .update({
+              system: systemName.trim(),
+              url: normalizedUrl,
+            })
+            .eq("id", editingId)
+            .select()
+            .single();
+
+          if (error) throw error;
+
+          setImportantLinks((prev) =>
+            prev.map((item) =>
+              item.id === editingId ? (data as ImportantLinkItem) : item,
+            ),
+          );
+          toast.success("Link atualizado com sucesso!");
+        } else {
+          const { data, error } = await supabase
+            .from("important_links")
+            .insert([
+              {
+                system: systemName.trim(),
+                url: normalizedUrl,
+              },
+            ])
+            .select()
+            .single();
+
+          if (error) throw error;
+
+          setImportantLinks((prev) => [data as ImportantLinkItem, ...prev]);
+          toast.success("Link adicionado com sucesso!");
+        }
+      }
+
       resetForm();
       setOpenDialog(false);
     } catch (error: any) {
@@ -582,6 +672,16 @@ const Index = () => {
     [drivers, search],
   );
 
+  const filteredImportantLinks = useMemo(
+    () =>
+      importantLinks.filter(
+        (item) =>
+          item.system.toLowerCase().includes(search.toLowerCase()) ||
+          item.url.toLowerCase().includes(search.toLowerCase()),
+      ),
+    [importantLinks, search],
+  );
+
   return (
     <div className="relative min-h-screen overflow-hidden bg-background">
       <div
@@ -608,7 +708,7 @@ const Index = () => {
             <div className="relative ml-auto w-full max-w-md">
               <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-primary-foreground/50" />
               <Input
-                placeholder="Buscar scripts, contatos, FAQs ou drivers..."
+                placeholder="Buscar scripts, contatos, FAQs, drivers ou links..."
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 className="border-primary-foreground/20 bg-primary-foreground/10 pl-10 text-primary-foreground placeholder:text-primary-foreground/50 focus-visible:ring-primary-foreground/30"
@@ -648,13 +748,21 @@ const Index = () => {
               Novo Driver
             </Button>
 
+            <Button
+              onClick={() => openNewItemDialog("link")}
+              className="gap-2"
+            >
+              <Plus className="h-4 w-4" />
+              Novo Link
+            </Button>
+
             <Button variant="ghost" onClick={loadData} className="ml-auto">
               Atualizar
             </Button>
           </div>
 
           <Tabs defaultValue="scripts" className="w-full">
-            <TabsList className="mb-6 grid w-full max-w-2xl grid-cols-4">
+            <TabsList className="mb-6 grid w-full max-w-5xl grid-cols-5">
               <TabsTrigger value="scripts" className="gap-2">
                 <FileText className="h-4 w-4" />
                 Scripts ({filteredScripts.length})
@@ -673,6 +781,11 @@ const Index = () => {
               <TabsTrigger value="drivers" className="gap-2">
                 <HardDrive className="h-4 w-4" />
                 Drivers ({filteredDrivers.length})
+              </TabsTrigger>
+
+              <TabsTrigger value="links" className="gap-2">
+                <LinkIcon className="h-4 w-4" />
+                Links ({filteredImportantLinks.length})
               </TabsTrigger>
             </TabsList>
 
@@ -761,9 +874,19 @@ const Index = () => {
                         {contact.whatsapp && contact.whatsapp.length > 0 && (
                           <div className="flex flex-wrap items-center gap-2">
                             <MessageCircle className="h-4 w-4 shrink-0 text-primary" />
-                            <span className="text-sm">
-                              {contact.whatsapp.join(" / ")}
-                            </span>
+                            <div className="flex flex-wrap gap-2">
+                              {contact.whatsapp.map((zap, index) => (
+                                <a
+                                  key={`${zap}-${index}`}
+                                  href={toWhatsappUrl(zap)}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className="text-sm font-medium text-primary underline-offset-4 hover:underline"
+                                >
+                                  {zap}
+                                </a>
+                              ))}
+                            </div>
                           </div>
                         )}
 
@@ -978,6 +1101,65 @@ const Index = () => {
                 </div>
               )}
             </TabsContent>
+
+            <TabsContent value="links">
+              {loading ? (
+                <p className="py-12 text-center text-muted-foreground">
+                  Carregando links...
+                </p>
+              ) : (
+                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                  {filteredImportantLinks.map((item) => (
+                    <Card
+                      key={item.id}
+                      className="border-white/20 bg-white/90 backdrop-blur-sm transition-shadow hover:shadow-lg"
+                    >
+                      <CardHeader className="pb-2">
+                        <CardTitle className="flex items-start justify-between gap-2 text-base">
+                          <span>{item.system}</span>
+                          <Badge variant="secondary" className="text-xs">
+                            Link
+                          </Badge>
+                        </CardTitle>
+                      </CardHeader>
+
+                      <CardContent className="space-y-3">
+                        <a
+                          href={item.url}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="block break-all text-sm font-medium text-primary underline-offset-4 hover:underline"
+                        >
+                          {item.url}
+                        </a>
+
+                        <Button asChild size="sm" className="w-full gap-2">
+                          <a href={item.url} target="_blank" rel="noreferrer">
+                            Abrir link
+                          </a>
+                        </Button>
+
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => handleEdit("link", item)}
+                          className="w-full gap-2"
+                        >
+                          <Pencil className="h-4 w-4" />
+                          Editar
+                        </Button>
+                      </CardContent>
+                    </Card>
+                  ))}
+
+                  {filteredImportantLinks.length === 0 && (
+                    <p className="col-span-full py-12 text-center text-muted-foreground">
+                      Nenhum link encontrado.
+                    </p>
+                  )}
+                </div>
+              )}
+            </TabsContent>
           </Tabs>
 
           <Dialog open={openDialog} onOpenChange={setOpenDialog}>
@@ -991,6 +1173,10 @@ const Index = () => {
                     (isEditing ? "Editar FAQ" : "Adicionar nova FAQ")}
                   {formType === "driver" &&
                     (isEditing ? "Editar Driver" : "Adicionar novo Driver")}
+                  {formType === "link" &&
+                    (isEditing
+                      ? "Editar Link Importante"
+                      : "Adicionar Link Importante")}
                 </DialogTitle>
               </DialogHeader>
 
@@ -1066,6 +1252,19 @@ const Index = () => {
                       <Label>Arquivo</Label>
                       <Input
                         type="file"
+                        className="
+                          cursor-pointer
+                          file:bg-primary
+                          file:text-white
+                          file:border-1
+                          file:px-0
+                          file:py-0
+                          file:rounded-md
+                          file:mr-1
+                          file:cursor-pointer
+                          file:font-medium
+                          hover:file:bg-primary/90
+                        "
                         onChange={(e) => setFile(e.target.files?.[0] || null)}
                       />
                     </div>
@@ -1094,11 +1293,47 @@ const Index = () => {
 
                     <div className="space-y-2">
                       <Label>Driver</Label>
+
                       <Input
                         type="file"
+                        className="
+                          cursor-pointer
+                          file:bg-primary
+                          file:text-white
+                          file:border-1
+                          file:px-0
+                          file:py-0
+                          file:rounded-md
+                          file:mr-1
+                          file:cursor-pointer
+                          file:font-medium
+                          hover:file:bg-primary/90
+                        "
                         onChange={(e) =>
                           setDriverFile(e.target.files?.[0] || null)
                         }
+                      />
+                    </div>
+                  </>
+                )}
+
+                {formType === "link" && (
+                  <>
+                    <div className="space-y-2">
+                      <Label>Sistema</Label>
+                      <Input
+                        value={systemName}
+                        onChange={(e) => setSystemName(e.target.value)}
+                        placeholder="Ex: Portal de Serviços"
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label>Link</Label>
+                      <Input
+                        value={linkUrl}
+                        onChange={(e) => setLinkUrl(e.target.value)}
+                        placeholder="Ex: https://portal.exemplo.com"
                       />
                     </div>
                   </>
