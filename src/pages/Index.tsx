@@ -13,6 +13,7 @@ import {
   User,
   HardDrive,
   Computer,
+  Database,
   Pencil,
   Link as LinkIcon,
 } from "lucide-react";
@@ -695,13 +696,13 @@ const Index = () => {
           <div className="mx-auto flex max-w-6xl items-center gap-4 px-4 py-4">
             <div className="flex items-center gap-3">
               <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary-foreground/20 text-lg font-bold text-primary-foreground">
-                <Computer />
+                <Database/>
               </div>
               <div>
-                <h1 className="text-lg font-bold leading-tight">Suporte</h1>
-                <p className="text-xs text-primary-foreground/70">
+                <h1 className="text-lg font-bold leading-tight">Suporte TI</h1>
+                <h1 className="text-xs text-primary-foreground/70">
                   Base de conhecimento
-                </p>
+                </h1>
               </div>
             </div>
 
@@ -1138,6 +1139,7 @@ const Index = () => {
                             Abrir link
                           </a>
                         </Button>
+                      
 
                         <Button
                           size="sm"
