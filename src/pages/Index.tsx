@@ -88,6 +88,27 @@ type FormType = "script" | "contact" | "faq" | "driver" | "link";
 const FAQ_BUCKET = "faq-files";
 const DRIVER_BUCKET = "driver-files";
 
+const formatDateBR = (date: string) => {
+  if (!date) return "-";
+
+  // remove microssegundos (JS não suporta direito)
+  const clean = date.split(".")[0];
+
+  // transforma em ISO válido
+  const iso = clean.replace(" ", "T") + "Z";
+
+  const d = new Date(iso);
+
+  return d.toLocaleString("pt-BR", {
+    timeZone: "America/Sao_Paulo",
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+};
+
 const Index = () => {
   const [search, setSearch] = useState("");
   const [copiedId, setCopiedId] = useState<number | null>(null);
@@ -833,12 +854,12 @@ const Index = () => {
                           Editar
                         </Button>
 <p className="text-xs text-muted-foreground">
-  Criado: {script.created_at ? new Date(script.created_at).toLocaleString() : "-"}
+  Criado: {script.created_at ? formatDateBR(script.created_at) : "-"}
 </p>
 
 {script.updated_at && (
   <p className="text-xs text-muted-foreground">
-    Atualizado: {new Date(script.updated_at).toLocaleString()}
+    Atualizado: {formatDateBR(script.updated_at)}
   </p>
 )}
 
@@ -960,14 +981,14 @@ const Index = () => {
                           Editar
                         </Button>
                         <p className="text-xs text-muted-foreground">
-                          Criado: {contact.created_at ? new Date(contact.created_at).toLocaleString() : "-"}
-                        </p>
+  Criado: {contact.created_at ? formatDateBR(contact.created_at) : "-"}
+</p>
 
-                        {contact.updated_at && (
-                          <p className="text-xs text-muted-foreground">
-                            Atualizado: {new Date(contact.updated_at).toLocaleString()}
-                          </p>
-                        )}
+{contact.updated_at && (
+  <p className="text-xs text-muted-foreground">
+    Atualizado: {formatDateBR(contact.updated_at)}
+  </p>
+)}
 
                       </CardContent>
                     </Card>
@@ -1054,14 +1075,14 @@ const Index = () => {
                         </Button>
 
                         <p className="text-xs text-muted-foreground">
-                        Criado: {faq.created_at ? new Date(faq.created_at).toLocaleString() : "-"}
-                      </p>
+  Criado: {faq.created_at ? formatDateBR(faq.created_at) : "-"}
+</p>
 
-                      {faq.updated_at && (
-                        <p className="text-xs text-muted-foreground">
-                          Atualizado: {new Date(faq.updated_at).toLocaleString()}
-                        </p>
-                      )}
+{faq.updated_at && (
+  <p className="text-xs text-muted-foreground">
+    Atualizado: {formatDateBR(faq.updated_at)}
+  </p>
+)}
                       </CardContent>
                     </Card>
                   ))}
@@ -1122,14 +1143,14 @@ const Index = () => {
                           Editar
                         </Button>
                         <p className="text-xs text-muted-foreground">
-                          Criado: {driver.created_at ? new Date(driver.created_at).toLocaleString() : "-"}
-                        </p>
+  Criado: {driver.created_at ? formatDateBR(driver.created_at) : "-"}
+</p>
 
-                        {driver.updated_at && (
-                          <p className="text-xs text-muted-foreground">
-                            Atualizado: {new Date(driver.updated_at).toLocaleString()}
-                          </p>
-                        )}
+{driver.updated_at && (
+  <p className="text-xs text-muted-foreground">
+    Atualizado: {formatDateBR(driver.updated_at)}
+  </p>
+)}
                         
                       </CardContent>
                     </Card>
@@ -1208,14 +1229,14 @@ const Index = () => {
                           Editar
                         </Button>
                         <p className="text-xs text-muted-foreground">
-                        Criado: {item.created_at ? new Date(item.created_at).toLocaleString() : "-"}
-                      </p>
+  Criado: {item.created_at ? formatDateBR(item.created_at) : "-"}
+</p>
 
-                      {item.updated_at && (
-                        <p className="text-xs text-muted-foreground">
-                          Atualizado: {new Date(item.updated_at).toLocaleString()}
-                        </p>
-                      )}
+{item.updated_at && (
+  <p className="text-xs text-muted-foreground">
+    Atualizado: {formatDateBR(item.updated_at)}
+  </p>
+)}
                       </CardContent>
                     </Card>
                   ))}
