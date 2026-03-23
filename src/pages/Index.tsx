@@ -12,10 +12,10 @@ import {
   Paperclip,
   User,
   HardDrive,
-  Computer,
   Database,
   Pencil,
   Link as LinkIcon,
+  LogOut,
 } from "lucide-react";
 
 import { Input } from "@/components/ui/input";
@@ -145,6 +145,12 @@ const Index = () => {
     setEditingId(item.id);
     setOpenDialog(true);
 
+    if (type === "script") {
+      const script = item as ScriptItem;
+      setTitle(script.title);
+      setText(script.text);
+    }
+
     if (type === "contact") {
       const contact = item as ContactItem;
       setTitle(contact.title);
@@ -210,6 +216,18 @@ const Index = () => {
     }
   };
 
+  const handleLogout = async () => {
+    try {
+      const { error } = await supabase.auth.signOut();
+      if (error) throw error;
+
+      toast.success("Logout realizado com sucesso!");
+    } catch (error: any) {
+      console.error("Erro ao sair:", error);
+      toast.error(error?.message || "Erro ao sair da conta.");
+    }
+  };
+
   const getFileNameFromUrl = (url?: string | null) => {
     if (!url) return "";
     try {
@@ -227,15 +245,9 @@ const Index = () => {
       const [scriptsRes, contactsRes, faqsRes, driversRes, linksRes] =
         await Promise.all([
           supabase.from("scripts").select("*").order("id", { ascending: false }),
-          supabase
-            .from("contacts")
-            .select("*")
-            .order("id", { ascending: false }),
+          supabase.from("contacts").select("*").order("id", { ascending: false }),
           supabase.from("faqs").select("*").order("id", { ascending: false }),
-          supabase
-            .from("drivers")
-            .select("*")
-            .order("id", { ascending: false }),
+          supabase.from("drivers").select("*").order("id", { ascending: false }),
           supabase
             .from("important_links")
             .select("*")
@@ -356,21 +368,42 @@ const Index = () => {
 
     try {
       if (formType === "script") {
-        const { data, error } = await supabase
-          .from("scripts")
-          .insert([
-            {
+        if (isEditing && editingId) {
+          const { data, error } = await supabase
+            .from("scripts")
+            .update({
               title: title.trim(),
               text: text.trim(),
-            },
-          ])
-          .select()
-          .single();
+            })
+            .eq("id", editingId)
+            .select()
+            .single();
 
-        if (error) throw error;
+          if (error) throw error;
 
-        setScripts((prev) => [data as ScriptItem, ...prev]);
-        toast.success("Script adicionado com sucesso!");
+          setScripts((prev) =>
+            prev.map((item) =>
+              item.id === editingId ? (data as ScriptItem) : item,
+            ),
+          );
+          toast.success("Script atualizado com sucesso!");
+        } else {
+          const { data, error } = await supabase
+            .from("scripts")
+            .insert([
+              {
+                title: title.trim(),
+                text: text.trim(),
+              },
+            ])
+            .select()
+            .single();
+
+          if (error) throw error;
+
+          setScripts((prev) => [data as ScriptItem, ...prev]);
+          toast.success("Script adicionado com sucesso!");
+        }
       }
 
       if (formType === "contact") {
@@ -696,7 +729,7 @@ const Index = () => {
           <div className="mx-auto flex max-w-6xl items-center gap-4 px-4 py-4">
             <div className="flex items-center gap-3">
               <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary-foreground/20 text-lg font-bold text-primary-foreground">
-                <Database/>
+                <Database />
               </div>
               <div>
                 <h1 className="text-lg font-bold leading-tight">Suporte TI</h1>
@@ -715,6 +748,15 @@ const Index = () => {
                 className="border-primary-foreground/20 bg-primary-foreground/10 pl-10 text-primary-foreground placeholder:text-primary-foreground/50 focus-visible:ring-primary-foreground/30"
               />
             </div>
+
+            <Button
+              variant="secondary"
+              onClick={handleLogout}
+              className="gap-2 whitespace-nowrap"
+            >
+              <LogOut className="h-4 w-4" />
+              Sair
+            </Button>
           </div>
         </header>
 
@@ -830,6 +872,16 @@ const Index = () => {
                               <Copy className="h-4 w-4" /> Copiar
                             </>
                           )}
+                        </Button>
+
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => handleEdit("script", script)}
+                          className="w-full gap-2"
+                        >
+                          <Pencil className="h-4 w-4" />
+                          Editar
                         </Button>
                       </CardContent>
                     </Card>
@@ -1139,7 +1191,23 @@ const Index = () => {
                             Abrir link
                           </a>
                         </Button>
-                      
+
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => handleCopy(item.url, item.id)}
+                          className="w-full gap-2"
+                        >
+                          {copiedId === item.id ? (
+                            <>
+                              <Check className="h-4 w-4" /> Copiado!
+                            </>
+                          ) : (
+                            <>
+                              <Copy className="h-4 w-4" /> Copiar link
+                            </>
+                          )}
+                        </Button>
 
                         <Button
                           size="sm"
@@ -1168,7 +1236,8 @@ const Index = () => {
             <DialogContent className="sm:max-w-lg">
               <DialogHeader>
                 <DialogTitle>
-                  {formType === "script" && "Adicionar novo Script"}
+                  {formType === "script" &&
+                    (isEditing ? "Editar Script" : "Adicionar novo Script")}
                   {formType === "contact" &&
                     (isEditing ? "Editar Contato" : "Contato de Setor")}
                   {formType === "faq" &&
@@ -1295,7 +1364,6 @@ const Index = () => {
 
                     <div className="space-y-2">
                       <Label>Driver</Label>
-
                       <Input
                         type="file"
                         className="
@@ -1350,13 +1418,7 @@ const Index = () => {
                     Cancelar
                   </Button>
                   <Button onClick={handleSave} disabled={saving}>
-                    {saving
-                      ? "Salvando..."
-                      : formType === "script"
-                        ? "Salvar"
-                        : isEditing
-                          ? "Atualizar"
-                          : "Salvar"}
+                    {saving ? "Salvando..." : isEditing ? "Atualizar" : "Salvar"}
                   </Button>
                 </div>
               </div>
