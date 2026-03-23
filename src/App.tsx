@@ -13,13 +13,13 @@ export default function App() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // pega sessão inicial
+    // Sessão inicial
     supabase.auth.getSession().then(({ data }) => {
       setSession(data.session);
       setLoading(false);
     });
 
-    // escuta mudanças de login/logout/reset
+    // Listener de autenticação
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, session) => {
@@ -40,26 +40,19 @@ export default function App() {
   return (
     <BrowserRouter>
       <Routes>
-        {/* LOGIN */}
+        {/* HOME (LOGIN OU DASHBOARD DIRETO) */}
         <Route
           path="/"
           element={
-            session ? (
-              <Navigate to="/dashboard" />
-            ) : (
-              <Login onLoginSuccess={() => {}} />
-            )
+            session ? <Index /> : <Login onLoginSuccess={() => {}} />
           }
-        />
-
-        {/* DASHBOARD (PROTEGIDO) */}
-        <Route
-          path="/dashboard"
-          element={session ? <Index /> : <Navigate to="/" />}
         />
 
         {/* RESET PASSWORD */}
         <Route path="/reset-password" element={<ResetPassword />} />
+
+        {/* QUALQUER OUTRA ROTA REDIRECIONA PRA HOME */}
+        <Route path="*" element={<Navigate to="/" />} />
       </Routes>
 
       <Toaster richColors position="top-right" />
