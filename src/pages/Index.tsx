@@ -36,10 +36,13 @@ import {
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 
+// 🔥 TYPES ATUALIZADOS
 type ScriptItem = {
   id: number;
   title: string;
   text: string;
+  created_at?: string;
+  updated_at?: string;
 };
 
 type ContactItem = {
@@ -49,6 +52,8 @@ type ContactItem = {
   phones?: string[];
   whatsapp?: string[];
   emails?: string[];
+  created_at?: string;
+  updated_at?: string;
 };
 
 type FAQItem = {
@@ -57,6 +62,8 @@ type FAQItem = {
   text: string;
   author?: string | null;
   file_url?: string | null;
+  created_at?: string;
+  updated_at?: string;
 };
 
 type DriverItem = {
@@ -64,12 +71,16 @@ type DriverItem = {
   equipment: string;
   author: string;
   file_url: string;
+  created_at?: string;
+  updated_at?: string;
 };
 
 type ImportantLinkItem = {
   id: number;
   system: string;
   url: string;
+  created_at?: string;
+  updated_at?: string;
 };
 
 type FormType = "script" | "contact" | "faq" | "driver" | "link";
@@ -278,383 +289,321 @@ const Index = () => {
   }, []);
 
   const handleSave = async () => {
-    if (formType === "driver") {
-      if (!equipment.trim() || !author.trim()) {
-        toast.error("Preencha equipamento e autor.");
-        return;
-      }
+  const now = new Date().toISOString();
 
-      if (!isEditing && !driverFile) {
-        toast.error("Selecione o arquivo do driver.");
-        return;
-      }
-    } else if (formType === "link") {
-      if (!systemName.trim() || !linkUrl.trim()) {
-        toast.error("Preencha sistema e link.");
-        return;
-      }
-    } else {
-      if (!title.trim() || !text.trim()) {
-        toast.error("Preencha título e conteúdo.");
-        return;
-      }
-
-      if (formType === "faq" && !author.trim()) {
-        toast.error("Informe o autor da FAQ.");
-        return;
-      }
+  if (formType === "driver") {
+    if (!equipment.trim() || !author.trim()) {
+      toast.error("Preencha equipamento e autor.");
+      return;
     }
 
-    if (formType === "contact") {
-      const normalizedTitle = title.trim().toLowerCase();
-      const newPhones = toArray(phones);
-      const newWhatsapp = toArray(whatsapp);
-      const newEmails = toArray(emails).map((email) => email.toLowerCase());
-
-      const duplicateContact = contacts.find((contact) => {
-        if (isEditing && contact.id === editingId) return false;
-
-        const sameTitle =
-          contact.title.trim().toLowerCase() === normalizedTitle;
-
-        const samePhone = (contact.phones || []).some((phone) =>
-          newPhones.includes(phone),
-        );
-
-        const sameWhatsapp = (contact.whatsapp || []).some((zap) =>
-          newWhatsapp.includes(zap),
-        );
-
-        const sameEmail = (contact.emails || []).some((email) =>
-          newEmails.includes(email.toLowerCase()),
-        );
-
-        return sameTitle || samePhone || sameWhatsapp || sameEmail;
-      });
-
-      if (duplicateContact) {
-        if (duplicateContact.title.trim().toLowerCase() === normalizedTitle) {
-          toast.error("Já existe um setor cadastrado com esse nome.");
-          return;
-        }
-
-        const phoneDuplicado = (duplicateContact.phones || []).find((phone) =>
-          newPhones.includes(phone),
-        );
-        if (phoneDuplicado) {
-          toast.error(`O telefone ${phoneDuplicado} já está cadastrado.`);
-          return;
-        }
-
-        const whatsappDuplicado = (duplicateContact.whatsapp || []).find(
-          (zap) => newWhatsapp.includes(zap),
-        );
-        if (whatsappDuplicado) {
-          toast.error(`O WhatsApp ${whatsappDuplicado} já está cadastrado.`);
-          return;
-        }
-
-        const emailDuplicado = (duplicateContact.emails || []).find((email) =>
-          newEmails.includes(email.toLowerCase()),
-        );
-        if (emailDuplicado) {
-          toast.error(`O e-mail ${emailDuplicado} já está cadastrado.`);
-          return;
-        }
-      }
+    if (!isEditing && !driverFile) {
+      toast.error("Selecione o arquivo do driver.");
+      return;
+    }
+  } else if (formType === "link") {
+    if (!systemName.trim() || !linkUrl.trim()) {
+      toast.error("Preencha sistema e link.");
+      return;
+    }
+  } else {
+    if (!title.trim() || !text.trim()) {
+      toast.error("Preencha título e conteúdo.");
+      return;
     }
 
-    setSaving(true);
+    if (formType === "faq" && !author.trim()) {
+      toast.error("Informe o autor da FAQ.");
+      return;
+    }
+  }
 
-    try {
-      if (formType === "script") {
-        if (isEditing && editingId) {
-          const { data, error } = await supabase
-            .from("scripts")
-            .update({
+  setSaving(true);
+
+  try {
+    // =========================
+    // SCRIPTS
+    // =========================
+    if (formType === "script") {
+      if (isEditing && editingId) {
+        const { data, error } = await supabase
+          .from("scripts")
+          .update({
+            title: title.trim(),
+            text: text.trim(),
+            updated_at: now,
+          })
+          .eq("id", editingId)
+          .select()
+          .single();
+
+        if (error) throw error;
+
+        setScripts((prev) =>
+          prev.map((item) =>
+            item.id === editingId ? (data as ScriptItem) : item,
+          ),
+        );
+
+        toast.success("Script atualizado!");
+      } else {
+        const { data, error } = await supabase
+          .from("scripts")
+          .insert([
+            {
               title: title.trim(),
               text: text.trim(),
-            })
-            .eq("id", editingId)
-            .select()
-            .single();
+              created_at: now,
+            },
+          ])
+          .select()
+          .single();
 
-          if (error) throw error;
+        if (error) throw error;
 
-          setScripts((prev) =>
-            prev.map((item) =>
-              item.id === editingId ? (data as ScriptItem) : item,
-            ),
-          );
-          toast.success("Script atualizado com sucesso!");
-        } else {
-          const { data, error } = await supabase
-            .from("scripts")
-            .insert([
-              {
-                title: title.trim(),
-                text: text.trim(),
-              },
-            ])
-            .select()
-            .single();
+        setScripts((prev) => [data as ScriptItem, ...prev]);
 
-          if (error) throw error;
-
-          setScripts((prev) => [data as ScriptItem, ...prev]);
-          toast.success("Script adicionado com sucesso!");
-        }
+        toast.success("Script criado!");
       }
+    }
 
-      if (formType === "contact") {
-        if (isEditing && editingId) {
-          const { data, error } = await supabase
-            .from("contacts")
-            .update({
+    // =========================
+    // CONTACTS
+    // =========================
+    if (formType === "contact") {
+      if (isEditing && editingId) {
+        const { data, error } = await supabase
+          .from("contacts")
+          .update({
+            title: title.trim(),
+            text: text.trim(),
+            phones: toArray(phones),
+            whatsapp: toArray(whatsapp),
+            emails: toArray(emails),
+            updated_at: now,
+          })
+          .eq("id", editingId)
+          .select()
+          .single();
+
+        if (error) throw error;
+
+        setContacts((prev) =>
+          prev.map((item) =>
+            item.id === editingId ? (data as ContactItem) : item,
+          ),
+        );
+
+        toast.success("Contato atualizado!");
+      } else {
+        const { data, error } = await supabase
+          .from("contacts")
+          .insert([
+            {
               title: title.trim(),
               text: text.trim(),
               phones: toArray(phones),
               whatsapp: toArray(whatsapp),
               emails: toArray(emails),
-            })
-            .eq("id", editingId)
-            .select()
-            .single();
+              created_at: now,
+            },
+          ])
+          .select()
+          .single();
 
-          if (error) throw error;
+        if (error) throw error;
 
-          setContacts((prev) =>
-            prev.map((item) =>
-              item.id === editingId ? (data as ContactItem) : item,
-            ),
-          );
-          toast.success("Contato atualizado com sucesso!");
-        } else {
-          const { data, error } = await supabase
-            .from("contacts")
-            .insert([
-              {
-                title: title.trim(),
-                text: text.trim(),
-                phones: toArray(phones),
-                whatsapp: toArray(whatsapp),
-                emails: toArray(emails),
-              },
-            ])
-            .select()
-            .single();
+        setContacts((prev) => [data as ContactItem, ...prev]);
 
-          if (error) throw error;
+        toast.success("Contato criado!");
+      }
+    }
 
-          setContacts((prev) => [data as ContactItem, ...prev]);
-          toast.success("Contato adicionado com sucesso!");
-        }
+    // =========================
+    // FAQ
+    // =========================
+    if (formType === "faq") {
+      let fileUrl: string | null | undefined = undefined;
+
+      if (file) {
+        const safeName = sanitizeFileName(file.name);
+        const filePath = `faq/${Date.now()}-${safeName}`;
+
+        await supabase.storage.from(FAQ_BUCKET).upload(filePath, file);
+
+        const { data: publicUrlData } = supabase.storage
+          .from(FAQ_BUCKET)
+          .getPublicUrl(filePath);
+
+        fileUrl = publicUrlData.publicUrl;
       }
 
-      if (formType === "faq") {
-        let fileUrl: string | null | undefined = undefined;
-
-        if (file) {
-          const safeName = sanitizeFileName(file.name);
-          const filePath = `faq/${Date.now()}-${safeName}`;
-
-          const { error: uploadError } = await supabase.storage
-            .from(FAQ_BUCKET)
-            .upload(filePath, file, {
-              cacheControl: "3600",
-              upsert: false,
-            });
-
-          if (uploadError) throw uploadError;
-
-          const { data: publicUrlData } = supabase.storage
-            .from(FAQ_BUCKET)
-            .getPublicUrl(filePath);
-
-          fileUrl = publicUrlData.publicUrl;
-        }
-
-        if (isEditing && editingId) {
-          const updatePayload: {
-            title: string;
-            text: string;
-            author: string;
-            file_url?: string | null;
-          } = {
+      if (isEditing && editingId) {
+        const { data, error } = await supabase
+          .from("faqs")
+          .update({
             title: title.trim(),
             text: text.trim(),
             author: author.trim(),
-          };
+            file_url: fileUrl,
+            updated_at: now,
+          })
+          .eq("id", editingId)
+          .select()
+          .single();
 
-          if (fileUrl !== undefined) {
-            updatePayload.file_url = fileUrl;
-          }
+        if (error) throw error;
 
-          const { data, error } = await supabase
-            .from("faqs")
-            .update(updatePayload)
-            .eq("id", editingId)
-            .select()
-            .single();
+        setFaqs((prev) =>
+          prev.map((item) =>
+            item.id === editingId ? (data as FAQItem) : item,
+          ),
+        );
 
-          if (error) throw error;
+        toast.success("FAQ atualizada!");
+      } else {
+        const { data, error } = await supabase
+          .from("faqs")
+          .insert([
+            {
+              title: title.trim(),
+              text: text.trim(),
+              author: author.trim(),
+              file_url: fileUrl ?? null,
+              created_at: now,
+            },
+          ])
+          .select()
+          .single();
 
-          setFaqs((prev) =>
-            prev.map((item) =>
-              item.id === editingId ? (data as FAQItem) : item,
-            ),
-          );
-          toast.success("FAQ atualizada com sucesso!");
-        } else {
-          const { data, error } = await supabase
-            .from("faqs")
-            .insert([
-              {
-                title: title.trim(),
-                text: text.trim(),
-                author: author.trim(),
-                file_url: fileUrl ?? null,
-              },
-            ])
-            .select()
-            .single();
+        if (error) throw error;
 
-          if (error) throw error;
+        setFaqs((prev) => [data as FAQItem, ...prev]);
 
-          setFaqs((prev) => [data as FAQItem, ...prev]);
-          toast.success("FAQ adicionada com sucesso!");
-        }
+        toast.success("FAQ criada!");
+      }
+    }
+
+    // =========================
+    // DRIVER
+    // =========================
+    if (formType === "driver") {
+      let fileUrl: string | undefined;
+
+      if (driverFile) {
+        const safeName = sanitizeFileName(driverFile.name);
+        const filePath = `drivers/${Date.now()}-${safeName}`;
+
+        await supabase.storage.from(DRIVER_BUCKET).upload(filePath, driverFile);
+
+        const { data } = supabase.storage
+          .from(DRIVER_BUCKET)
+          .getPublicUrl(filePath);
+
+        fileUrl = data.publicUrl;
       }
 
-      if (formType === "driver") {
-        let fileUrl: string | undefined = undefined;
-
-        if (driverFile) {
-          const safeName = sanitizeFileName(driverFile.name);
-          const filePath = `drivers/${Date.now()}-${safeName}`;
-
-          const { error: uploadError } = await supabase.storage
-            .from(DRIVER_BUCKET)
-            .upload(filePath, driverFile, {
-              cacheControl: "3600",
-              upsert: false,
-            });
-
-          if (uploadError) throw uploadError;
-
-          const { data: publicUrlData } = supabase.storage
-            .from(DRIVER_BUCKET)
-            .getPublicUrl(filePath);
-
-          fileUrl = publicUrlData.publicUrl;
-        }
-
-        if (isEditing && editingId) {
-          const updatePayload: {
-            equipment: string;
-            author: string;
-            file_url?: string;
-          } = {
+      if (isEditing && editingId) {
+        const { data, error } = await supabase
+          .from("drivers")
+          .update({
             equipment: equipment.trim(),
             author: author.trim(),
-          };
+            file_url: fileUrl,
+            updated_at: now,
+          })
+          .eq("id", editingId)
+          .select()
+          .single();
 
-          if (fileUrl) {
-            updatePayload.file_url = fileUrl;
-          }
+        if (error) throw error;
 
-          const { data, error } = await supabase
-            .from("drivers")
-            .update(updatePayload)
-            .eq("id", editingId)
-            .select()
-            .single();
+        setDrivers((prev) =>
+          prev.map((item) =>
+            item.id === editingId ? (data as DriverItem) : item,
+          ),
+        );
 
-          if (error) throw error;
+        toast.success("Driver atualizado!");
+      } else {
+        const { data, error } = await supabase
+          .from("drivers")
+          .insert([
+            {
+              equipment: equipment.trim(),
+              author: author.trim(),
+              file_url: fileUrl,
+              created_at: now,
+            },
+          ])
+          .select()
+          .single();
 
-          setDrivers((prev) =>
-            prev.map((item) =>
-              item.id === editingId ? (data as DriverItem) : item,
-            ),
-          );
-          toast.success("Driver atualizado com sucesso!");
-        } else {
-          if (!fileUrl) {
-            toast.error("Selecione o arquivo do driver.");
-            setSaving(false);
-            return;
-          }
+        if (error) throw error;
 
-          const { data, error } = await supabase
-            .from("drivers")
-            .insert([
-              {
-                equipment: equipment.trim(),
-                author: author.trim(),
-                file_url: fileUrl,
-              },
-            ])
-            .select()
-            .single();
+        setDrivers((prev) => [data as DriverItem, ...prev]);
 
-          if (error) throw error;
-
-          setDrivers((prev) => [data as DriverItem, ...prev]);
-          toast.success("Driver adicionado com sucesso!");
-        }
+        toast.success("Driver criado!");
       }
+    }
 
-      if (formType === "link") {
-        const normalizedUrl = normalizeUrl(linkUrl);
+    // =========================
+    // LINKS
+    // =========================
+    if (formType === "link") {
+      const normalizedUrl = normalizeUrl(linkUrl);
 
-        if (isEditing && editingId) {
-          const { data, error } = await supabase
-            .from("important_links")
-            .update({
+      if (isEditing && editingId) {
+        const { data, error } = await supabase
+          .from("important_links")
+          .update({
+            system: systemName.trim(),
+            url: normalizedUrl,
+            updated_at: now,
+          })
+          .eq("id", editingId)
+          .select()
+          .single();
+
+        if (error) throw error;
+
+        setImportantLinks((prev) =>
+          prev.map((item) =>
+            item.id === editingId ? (data as ImportantLinkItem) : item,
+          ),
+        );
+
+        toast.success("Link atualizado!");
+      } else {
+        const { data, error } = await supabase
+          .from("important_links")
+          .insert([
+            {
               system: systemName.trim(),
               url: normalizedUrl,
-            })
-            .eq("id", editingId)
-            .select()
-            .single();
+              created_at: now,
+            },
+          ])
+          .select()
+          .single();
 
-          if (error) throw error;
+        if (error) throw error;
 
-          setImportantLinks((prev) =>
-            prev.map((item) =>
-              item.id === editingId ? (data as ImportantLinkItem) : item,
-            ),
-          );
-          toast.success("Link atualizado com sucesso!");
-        } else {
-          const { data, error } = await supabase
-            .from("important_links")
-            .insert([
-              {
-                system: systemName.trim(),
-                url: normalizedUrl,
-              },
-            ])
-            .select()
-            .single();
+        setImportantLinks((prev) => [data as ImportantLinkItem, ...prev]);
 
-          if (error) throw error;
-
-          setImportantLinks((prev) => [data as ImportantLinkItem, ...prev]);
-          toast.success("Link adicionado com sucesso!");
-        }
+        toast.success("Link criado!");
       }
-
-      resetForm();
-      setOpenDialog(false);
-    } catch (error: any) {
-      console.error("Erro ao salvar:", error);
-      toast.error(error?.message || "Erro ao salvar registro.");
-    } finally {
-      setSaving(false);
     }
-  };
 
+    resetForm();
+    setOpenDialog(false);
+  } catch (error: any) {
+    console.error(error);
+    toast.error("Erro ao salvar");
+  } finally {
+    setSaving(false);
+  }
+};
   const filteredScripts = useMemo(
     () =>
       scripts.filter(
@@ -883,6 +832,16 @@ const Index = () => {
                           <Pencil className="h-4 w-4" />
                           Editar
                         </Button>
+<p className="text-xs text-muted-foreground">
+  Criado: {script.created_at ? new Date(script.created_at).toLocaleString() : "-"}
+</p>
+
+{script.updated_at && (
+  <p className="text-xs text-muted-foreground">
+    Atualizado: {new Date(script.updated_at).toLocaleString()}
+  </p>
+)}
+
                       </CardContent>
                     </Card>
                   ))}
@@ -1000,6 +959,16 @@ const Index = () => {
                           <Pencil className="h-4 w-4" />
                           Editar
                         </Button>
+                        <p className="text-xs text-muted-foreground">
+                          Criado: {contact.created_at ? new Date(contact.created_at).toLocaleString() : "-"}
+                        </p>
+
+                        {contact.updated_at && (
+                          <p className="text-xs text-muted-foreground">
+                            Atualizado: {new Date(contact.updated_at).toLocaleString()}
+                          </p>
+                        )}
+
                       </CardContent>
                     </Card>
                   ))}
@@ -1083,6 +1052,16 @@ const Index = () => {
                           <Pencil className="h-4 w-4" />
                           Editar
                         </Button>
+
+                        <p className="text-xs text-muted-foreground">
+                        Criado: {faq.created_at ? new Date(faq.created_at).toLocaleString() : "-"}
+                      </p>
+
+                      {faq.updated_at && (
+                        <p className="text-xs text-muted-foreground">
+                          Atualizado: {new Date(faq.updated_at).toLocaleString()}
+                        </p>
+                      )}
                       </CardContent>
                     </Card>
                   ))}
@@ -1142,6 +1121,16 @@ const Index = () => {
                           <Pencil className="h-4 w-4" />
                           Editar
                         </Button>
+                        <p className="text-xs text-muted-foreground">
+                          Criado: {driver.created_at ? new Date(driver.created_at).toLocaleString() : "-"}
+                        </p>
+
+                        {driver.updated_at && (
+                          <p className="text-xs text-muted-foreground">
+                            Atualizado: {new Date(driver.updated_at).toLocaleString()}
+                          </p>
+                        )}
+                        
                       </CardContent>
                     </Card>
                   ))}
@@ -1218,6 +1207,15 @@ const Index = () => {
                           <Pencil className="h-4 w-4" />
                           Editar
                         </Button>
+                        <p className="text-xs text-muted-foreground">
+                        Criado: {item.created_at ? new Date(item.created_at).toLocaleString() : "-"}
+                      </p>
+
+                      {item.updated_at && (
+                        <p className="text-xs text-muted-foreground">
+                          Atualizado: {new Date(item.updated_at).toLocaleString()}
+                        </p>
+                      )}
                       </CardContent>
                     </Card>
                   ))}
