@@ -722,7 +722,7 @@ const Index = () => {
             <Button
               variant="secondary"
               onClick={handleLogout}
-              className="gap-2 whitespace-nowrap"
+              className="bg-red-600 text-white hover:bg-red-700"
             >
               <LogOut className="h-4 w-4" />
               Sair
@@ -769,37 +769,52 @@ const Index = () => {
               Novo Link
             </Button>
 
-            <Button variant="ghost" onClick={loadData} className="ml-auto">
-              Atualizar
-            </Button>
+        <Button onClick={loadData} className="ml-auto">
+        Atualizar
+      </Button>
           </div>
 
           <Tabs defaultValue="scripts" className="w-full">
             <TabsList className="mb-6 grid w-full max-w-5xl grid-cols-5">
-              <TabsTrigger value="scripts" className="gap-2">
-                <FileText className="h-4 w-4" />
-                Scripts ({filteredScripts.length})
-              </TabsTrigger>
+              <TabsTrigger
+  value="scripts"
+  className="gap-2 hover:bg-blue-100 data-[state=active]:bg-blue-600 data-[state=active]:text-white"
+>
+  <FileText className="h-4 w-4" />
+  Scripts ({filteredScripts.length})
+</TabsTrigger>
 
-              <TabsTrigger value="contacts" className="gap-2">
-                <Phone className="h-4 w-4" />
-                Contatos ({filteredContacts.length})
-              </TabsTrigger>
+              <TabsTrigger
+  value="contacts"
+  className="gap-2 hover:bg-blue-100 data-[state=active]:bg-blue-600 data-[state=active]:text-white"
+>
+  <Phone className="h-4 w-4" />
+  Contatos ({filteredContacts.length})
+</TabsTrigger>
 
-              <TabsTrigger value="faq" className="gap-2">
-                <CircleHelp className="h-4 w-4" />
-                FAQs ({filteredFaqs.length})
-              </TabsTrigger>
+              <TabsTrigger
+  value="faq"
+  className="gap-2 hover:bg-blue-100 data-[state=active]:bg-blue-600 data-[state=active]:text-white"
+>
+  <CircleHelp className="h-4 w-4" />
+  FAQs ({filteredFaqs.length})
+</TabsTrigger>
 
-              <TabsTrigger value="drivers" className="gap-2">
-                <HardDrive className="h-4 w-4" />
-                Drivers ({filteredDrivers.length})
-              </TabsTrigger>
+              <TabsTrigger
+  value="drivers"
+  className="gap-2 hover:bg-blue-100 data-[state=active]:bg-blue-600 data-[state=active]:text-white"
+>
+  <HardDrive className="h-4 w-4" />
+  Drivers ({filteredDrivers.length})
+</TabsTrigger>
 
-              <TabsTrigger value="links" className="gap-2">
-                <LinkIcon className="h-4 w-4" />
-                Links ({filteredImportantLinks.length})
-              </TabsTrigger>
+              <TabsTrigger
+  value="links"
+  className="gap-2 hover:bg-blue-100 data-[state=active]:bg-blue-600 data-[state=active]:text-white"
+>
+  <LinkIcon className="h-4 w-4" />
+  Links ({filteredImportantLinks.length})
+</TabsTrigger>
             </TabsList>
 
             <TabsContent value="scripts">
