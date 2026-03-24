@@ -26,6 +26,7 @@ import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { supabase } from "@/lib/supabase";
 import backgroundImage from "@/assets/background.png";
+import { Heart } from "lucide-react";
 
 import {
   Dialog,
@@ -85,8 +86,11 @@ type ImportantLinkItem = {
 
 type FormType = "script" | "contact" | "faq" | "driver" | "link";
 
+
+
 const FAQ_BUCKET = "faq-files";
 const DRIVER_BUCKET = "driver-files";
+
 
 const formatDateBR = (date: string) => {
   if (!date) return "-";
@@ -158,6 +162,96 @@ const Index = () => {
     setIsEditing(false);
     setEditingId(null);
   };
+
+  // FAVORITOS
+const [favorites, setFavorites] = useState<any[]>([]);
+const [user, setUser] = useState<any>(null);
+
+
+useEffect(() => {
+  const getUser = async () => {
+    const { data } = await supabase.auth.getUser();
+    setUser(data.user);
+  };
+  getUser();
+}, []);
+
+const loadFavorites = async () => {
+  if (!user) return;
+
+  const { data, error } = await supabase
+    .from("favorites")
+    .select("*")
+    .eq("user_id", user.id);
+
+  if (error) {
+    console.error(error);
+    toast.error("Erro ao carregar favoritos");
+    return;
+  }
+
+  setFavorites(data || []);
+};
+
+const isFavorite = (itemId: number, type: string) => {
+  return favorites.some(
+    (f) => f.item_id === itemId && f.item_type === type
+  );
+};
+
+const toggleFavorite = async (itemId: number, type: string) => {
+  if (!user) {
+    toast.error("Usuário não autenticado");
+    return;
+  }
+
+  const existing = favorites.find(
+    (f) => f.item_id === itemId && f.item_type === type
+  );
+
+  try {
+    if (existing) {
+      const { error } = await supabase
+        .from("favorites")
+        .delete()
+        .eq("id", existing.id);
+
+      if (error) throw error;
+
+      setFavorites((prev) =>
+        prev.filter((f) => f.id !== existing.id)
+      );
+    } else {
+      const { data, error } = await supabase
+        .from("favorites")
+        .insert([
+          {
+            user_id: user.id,
+            item_id: itemId,
+            item_type: type,
+          },
+        ])
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      setFavorites((prev) => [...prev, data]);
+    }
+  } catch (err: any) {
+    console.error(err);
+    toast.error("Erro ao favoritar");
+  }
+};
+
+const sortByFavorite = (items: any[], type: string) => {
+  return [...items].sort((a, b) => {
+    const aFav = isFavorite(a.id, type) ? 1 : 0;
+    const bFav = isFavorite(b.id, type) ? 1 : 0;
+
+    return bFav - aFav; // favoritos primeiro
+  });
+};
 
   const openNewItemDialog = (type: FormType) => {
     resetForm();
@@ -305,9 +399,12 @@ const Index = () => {
     }
   };
 
-  useEffect(() => {
+ useEffect(() => {
+  if (user) {
     loadData();
-  }, []);
+    loadFavorites();
+  }
+}, [user]);
 
   const handleSave = async () => {
   const now = new Date().toISOString();
@@ -625,66 +722,91 @@ const Index = () => {
     setSaving(false);
   }
 };
-  const filteredScripts = useMemo(
-    () =>
-      scripts.filter(
-        (s) =>
-          s.title.toLowerCase().includes(search.toLowerCase()) ||
-          s.text.toLowerCase().includes(search.toLowerCase()),
-      ),
-    [scripts, search],
+ const filteredScripts = useMemo(() => {
+  const filtered = scripts.filter(
+    (s) =>
+      s.title.toLowerCase().includes(search.toLowerCase()) ||
+      s.text.toLowerCase().includes(search.toLowerCase())
   );
 
-  const filteredContacts = useMemo(
-    () =>
-      contacts.filter(
-        (c) =>
-          c.title.toLowerCase().includes(search.toLowerCase()) ||
-          c.text.toLowerCase().includes(search.toLowerCase()) ||
-          (c.emails || []).some((email) =>
-            email.toLowerCase().includes(search.toLowerCase()),
-          ) ||
-          (c.phones || []).some((phone) =>
-            phone.toLowerCase().includes(search.toLowerCase()),
-          ) ||
-          (c.whatsapp || []).some((zap) =>
-            zap.toLowerCase().includes(search.toLowerCase()),
-          ),
-      ),
-    [contacts, search],
+  return [...filtered].sort((a, b) => {
+    const aFav = isFavorite(a.id, "script") ? 1 : 0;
+    const bFav = isFavorite(b.id, "script") ? 1 : 0;
+
+    return bFav - aFav;
+  });
+}, [scripts, search, favorites]);
+
+const filteredContacts = useMemo(() => {
+  const filtered = contacts.filter(
+    (c) =>
+      c.title.toLowerCase().includes(search.toLowerCase()) ||
+      c.text.toLowerCase().includes(search.toLowerCase()) ||
+      (c.emails || []).some((email) =>
+        email.toLowerCase().includes(search.toLowerCase())
+      ) ||
+      (c.phones || []).some((phone) =>
+        phone.toLowerCase().includes(search.toLowerCase())
+      ) ||
+      (c.whatsapp || []).some((zap) =>
+        zap.toLowerCase().includes(search.toLowerCase())
+      )
   );
 
-  const filteredFaqs = useMemo(
-    () =>
-      faqs.filter(
-        (f) =>
-          f.title.toLowerCase().includes(search.toLowerCase()) ||
-          f.text.toLowerCase().includes(search.toLowerCase()) ||
-          (f.author || "").toLowerCase().includes(search.toLowerCase()),
-      ),
-    [faqs, search],
+  return [...filtered].sort((a, b) => {
+    const aFav = isFavorite(a.id, "contact") ? 1 : 0;
+    const bFav = isFavorite(b.id, "contact") ? 1 : 0;
+
+    return bFav - aFav;
+  });
+}, [contacts, search, favorites]);
+
+const filteredFaqs = useMemo(() => {
+  const filtered = faqs.filter(
+    (f) =>
+      f.title.toLowerCase().includes(search.toLowerCase()) ||
+      f.text.toLowerCase().includes(search.toLowerCase()) ||
+      (f.author || "").toLowerCase().includes(search.toLowerCase())
   );
 
-  const filteredDrivers = useMemo(
-    () =>
-      drivers.filter(
-        (d) =>
-          d.equipment.toLowerCase().includes(search.toLowerCase()) ||
-          d.author.toLowerCase().includes(search.toLowerCase()) ||
-          d.file_url.toLowerCase().includes(search.toLowerCase()),
-      ),
-    [drivers, search],
+  return [...filtered].sort((a, b) => {
+    const aFav = isFavorite(a.id, "faq") ? 1 : 0;
+    const bFav = isFavorite(b.id, "faq") ? 1 : 0;
+
+    return bFav - aFav;
+  });
+}, [faqs, search, favorites]);
+
+const filteredDrivers = useMemo(() => {
+  const filtered = drivers.filter(
+    (d) =>
+      d.equipment.toLowerCase().includes(search.toLowerCase()) ||
+      d.author.toLowerCase().includes(search.toLowerCase()) ||
+      d.file_url.toLowerCase().includes(search.toLowerCase())
   );
 
-  const filteredImportantLinks = useMemo(
-    () =>
-      importantLinks.filter(
-        (item) =>
-          item.system.toLowerCase().includes(search.toLowerCase()) ||
-          item.url.toLowerCase().includes(search.toLowerCase()),
-      ),
-    [importantLinks, search],
+  return [...filtered].sort((a, b) => {
+    const aFav = isFavorite(a.id, "driver") ? 1 : 0;
+    const bFav = isFavorite(b.id, "driver") ? 1 : 0;
+
+    return bFav - aFav;
+  });
+}, [drivers, search, favorites]);
+
+const filteredImportantLinks = useMemo(() => {
+  const filtered = importantLinks.filter(
+    (item) =>
+      item.system.toLowerCase().includes(search.toLowerCase()) ||
+      item.url.toLowerCase().includes(search.toLowerCase())
   );
+
+  return [...filtered].sort((a, b) => {
+    const aFav = isFavorite(a.id, "link") ? 1 : 0;
+    const bFav = isFavorite(b.id, "link") ? 1 : 0;
+
+    return bFav - aFav;
+  });
+}, [importantLinks, search, favorites]);
 
   return (
     <div className="relative min-h-screen overflow-hidden bg-background">
@@ -831,11 +953,23 @@ const Index = () => {
                     >
                       <CardHeader className="pb-2">
                         <CardTitle className="flex items-start justify-between gap-2 text-base">
-                          <span>{script.title}</span>
-                          <Badge variant="secondary" className="text-xs">
-                            Script
-                          </Badge>
-                        </CardTitle>
+  <span>{script.title}</span>
+
+  <div className="flex items-center gap-2">
+    <Badge variant="secondary" className="text-xs">
+      Script
+    </Badge>
+
+    <Heart
+      onClick={() => toggleFavorite(script.id, "script")}
+      className={`cursor-pointer ${
+        isFavorite(script.id, "script")
+          ? "text-red-500 fill-red-500"
+          : "text-gray-400"
+      }`}
+    />
+  </div>
+</CardTitle>
                       </CardHeader>
 
                       <CardContent className="space-y-3">
@@ -904,10 +1038,27 @@ const Index = () => {
                       className="border-white/20 bg-white/90 backdrop-blur-sm transition-shadow hover:shadow-lg"
                     >
                       <CardHeader className="pb-2">
-                        <CardTitle className="text-base">
-                          {contact.title}
-                        </CardTitle>
+                        <CardTitle className="flex items-start justify-between gap-2 text-base">
+  <span>{contact.title}</span>
+
+  <div className="flex items-center gap-2">
+    <Badge variant="secondary" className="text-xs">
+      Contatos
+    </Badge>
+
+    <Heart
+      onClick={() => toggleFavorite(contact.id, "contact")}
+      className={`cursor-pointer ${
+        isFavorite(contact.id, "contact")
+          ? "text-red-500 fill-red-500"
+          : "text-gray-400"
+      }`}
+    />
+  </div>
+</CardTitle>
+                        
                       </CardHeader>
+                      
 
                       <CardContent className="space-y-3">
                         {contact.phones && contact.phones.length > 0 && (
@@ -1032,11 +1183,23 @@ const Index = () => {
                     >
                       <CardHeader className="pb-2">
                         <CardTitle className="flex items-start justify-between gap-2 text-base">
-                          <span>{faq.title}</span>
-                          <Badge variant="secondary" className="text-xs">
-                            FAQ
-                          </Badge>
-                        </CardTitle>
+  <span>{faq.title}</span>
+
+  <div className="flex items-center gap-2">
+    <Badge variant="secondary" className="text-xs">
+      FAQ
+    </Badge>
+
+    <Heart
+      onClick={() => toggleFavorite(faq.id, "faq")}
+      className={`cursor-pointer ${
+        isFavorite(faq.id, "faq")
+          ? "text-red-500 fill-red-500"
+          : "text-gray-400"
+      }`}
+    />
+  </div>
+</CardTitle>
                       </CardHeader>
 
                       <CardContent className="space-y-3">
@@ -1125,11 +1288,23 @@ const Index = () => {
                     >
                       <CardHeader className="pb-2">
                         <CardTitle className="flex items-start justify-between gap-2 text-base">
-                          <span>{driver.equipment}</span>
-                          <Badge variant="secondary" className="text-xs">
-                            Driver
-                          </Badge>
-                        </CardTitle>
+  <span>{driver.equipment}</span>
+
+  <div className="flex items-center gap-2">
+    <Badge variant="secondary" className="text-xs">
+      Driver
+    </Badge>
+
+    <Heart
+      onClick={() => toggleFavorite(driver.id, "driver")}
+      className={`cursor-pointer ${
+        isFavorite(driver.id, "driver")
+          ? "text-red-500 fill-red-500"
+          : "text-gray-400"
+      }`}
+    />
+  </div>
+</CardTitle>
                       </CardHeader>
 
                       <CardContent className="space-y-3">
@@ -1193,12 +1368,26 @@ const Index = () => {
                       className="border-white/20 bg-white/90 backdrop-blur-sm transition-shadow hover:shadow-lg"
                     >
                       <CardHeader className="pb-2">
+                       
+
                         <CardTitle className="flex items-start justify-between gap-2 text-base">
-                          <span>{item.system}</span>
-                          <Badge variant="secondary" className="text-xs">
-                            Link
-                          </Badge>
-                        </CardTitle>
+ <span>{item.system}</span>
+
+  <div className="flex items-center gap-2">
+    <Badge variant="secondary" className="text-xs">
+      Links
+    </Badge>
+
+    <Heart
+      onClick={() => toggleFavorite(item.id, "link")}
+      className={`cursor-pointer ${
+        isFavorite(item.id, "link")
+          ? "text-red-500 fill-red-500"
+          : "text-gray-400"
+      }`}
+    />
+  </div>
+</CardTitle>
                       </CardHeader>
 
                       <CardContent className="space-y-3">
