@@ -163,6 +163,12 @@ const Index = () => {
     setEditingId(null);
   };
 
+  const sendToWhatsApp = (text: string) => {
+  const encoded = encodeURIComponent(text);
+  const url = `https://wa.me/?text=${encoded}`;
+  window.open(url, "_blank");
+};
+
   // FAVORITOS
 const [favorites, setFavorites] = useState<any[]>([]);
 const [user, setUser] = useState<any>(null);
@@ -244,6 +250,7 @@ const toggleFavorite = async (itemId: number, type: string) => {
   }
 };
 
+
 const sortByFavorite = (items: any[], type: string) => {
   return [...items].sort((a, b) => {
     const aFav = isFavorite(a.id, type) ? 1 : 0;
@@ -251,6 +258,47 @@ const sortByFavorite = (items: any[], type: string) => {
 
     return bFav - aFav; // favoritos primeiro
   });
+};
+
+
+
+const getZendeskTicketId = () => {
+  try {
+    const url = window.location.href;
+    const match = url.match(/tickets\/(\d+)/);
+    return match ? match[1] : null;
+  } catch {
+    return null;
+  }
+};
+
+const sendToZendesk = async (script: string) => {
+  const ticketId = getZendeskTicketId();
+
+  if (!ticketId) {
+    toast.error("ID do ticket não encontrado na URL");
+    return;
+  }
+
+  try {
+    const response = await fetch("/api/zendesk", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        ticketId,
+        message: script,
+      }),
+    });
+
+    if (!response.ok) throw new Error();
+
+    toast.success("Script enviado para o Zendesk 🚀");
+  } catch (error) {
+    console.error(error);
+    toast.error("Erro ao enviar para o Zendesk");
+  }
 };
 
   const openNewItemDialog = (type: FormType) => {
@@ -828,6 +876,7 @@ const filteredImportantLinks = useMemo(() => {
                 <h1 className="text-xs text-primary-foreground/70">
                   Base de conhecimento
                 </h1>
+                
               </div>
             </div>
 
@@ -1002,6 +1051,16 @@ const filteredImportantLinks = useMemo(() => {
                           <Pencil className="h-4 w-4" />
                           Editar
                         </Button>
+
+                        <Button
+  size="sm"
+  variant="secondary"
+  onClick={() => sendToWhatsApp(script.text)}
+  className="w-full gap-2"
+>
+  <MessageCircle className="h-4 w-4" />
+  Enviar no WhatsApp
+</Button>
 <p className="text-xs text-muted-foreground">
   Criado: {script.created_at ? formatDateBR(script.created_at) : "-"}
 </p>
